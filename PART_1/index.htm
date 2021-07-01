@@ -1,0 +1,217 @@
+<!DOCTYPE html>
+
+<head>
+    <title>Capture and Upload</title>
+    <script type="text/javascript" src="http://www.dynamsoft.com/library/dcs/dynamsoft.camera.min.js">
+    </script>
+    <style type="text/css">
+        body {
+            padding: 40px 10px;
+            margin: 0;
+        }
+
+        h1 {
+            margin: 0 0 30px 26px;
+        }
+
+        #main {
+            width: 985px;
+            margin: 0 auto;
+        }
+
+        .clearfix:after {
+            display: table;
+            content: '';
+            clear: both;
+        }
+
+        .d-btn {
+            display: inline-block;
+            padding: 0 25px;
+            height: 38px;
+            line-height: 32px;
+            color: #fe8e14;
+            font-family: OpenSans-Semibold;
+            font-size: 14px;
+            text-align: center;
+            cursor: pointer;
+            border: solid 2px #fe8e14;
+            border-radius: 3px;
+            -webkit-border-radius: 3px;
+            -moz-border-radius: 3px;
+            -o-border-radius: 3px;
+            -webkit-transition: all .2s ease-in-out;
+            -moz-transition: all .2s ease-in-out;
+            -ms-transition: all .2s ease-in-out;
+            -o-transition: all .2s ease-in-out;
+            transition: all .2s ease-in-out;
+        }
+
+        .d-btn:link,
+        .d-btn:visited {
+            color: #fe8e14;
+        }
+
+        .d-btn:hover {
+            color: #ffae38;
+            border: solid 2px #ffae38;
+        }
+
+        .d-btn.bgBlue {
+            border-color: #50a8e1;
+            background: #50a8e1;
+            color: #fff;
+        }
+
+        .d-btn.bgBlue:hover {
+            border-color: #61c2ec;
+            background: #61c2ec;
+        }
+
+        .btn-disabled-mobile.disabled {
+            border-color: #aaa !important;
+            color: #aaa !important;
+            background: #fff !important;
+        }
+
+        #btn-grp {
+            margin: 0 0 30px 26px;
+        }
+
+        #btn-grp select {
+            height: 38px;
+            min-width: 220px;
+            border-radius: 3px;
+            -webkit-border-radius: 3px;
+            -moz-border-radius: 3px;
+            -o-border-radius: 3px;
+            cursor: pointer;
+        }
+
+        #btn-grp .capture {
+            margin: 0 15px;
+        }
+    </style>
+</head>
+
+<body>
+    <div id="main">
+        <div id="btn-grp">
+            <select size="1" id="source" onchange="onSourceChanged()">
+            </select>
+            <input type="button" value="Capture" class="d-btn bgBlue capture" onclick="onCapture();" />
+            <input type="button" value="Upload" class="d-btn bgBlue" onclick="onUpload();" />
+        </div>
+        <div class="clearfix">
+            <div id="video-container" style="float:left;"></div>
+            <div id="image-container" style="float:left;"></div>
+        </div>
+        <script type="text/javascript">
+            var dcsObject, imageViewer;
+            var width = 480,
+                height = 320;
+
+            /**
+             * Capture images
+             * 
+             */
+            function onInitSuccess(videoViewerId, imageViewerId) {
+
+                dcsObject = dynamsoft.dcsEnv.getObject(videoViewerId);
+                dcsObject.videoviewer.setWidth(width);
+                dcsObject.videoviewer.setHeight(height);
+                imageViewer = dcsObject.getImageViewer(imageViewerId);
+                imageViewer.ui.setWidth(width);
+                imageViewer.ui.setHeight(height);
+                var cameraList = dcsObject.camera.getCameraList();
+                for (var i = 0; i < cameraList.length; i++) {
+                    document.getElementById("source").options.add(new Option(cameraList[i], i));
+                }
+
+                if (cameraList.length > 0) {
+                    dcsObject.camera.takeCameraOwnership(cameraList[0]);
+                    dcsObject.camera.playVideo();
+                } else {
+                    alert('No camera is connected.');
+                }
+            }
+
+            function onInitFailure(errorCode, errorString) {
+                alert('Init failed: ' + errorString);
+            }
+
+            function onSourceChanged() {
+                if (!dcsObject) return;
+                var source = document.getElementById("source");
+                var camera = source.options[source.selectedIndex].text;
+                dcsObject.camera.takeCameraOwnership(camera);
+                dcsObject.camera.playVideo();
+            }
+
+            function onCapture() {
+                if (!dcsObject) return;
+                dcsObject.camera.captureImage('image-container');
+                if (dcsObject.getErrorCode() !== EnumDCS_ErrorCode.OK) {
+                    alert('Capture error: ' + dcsObject.getErrorString());
+                }
+            }
+
+            /**
+             * Upload images
+             * 
+             */
+            function onUploadSuccess() {
+                alert('Image successfully uploaded!');
+            }
+
+            function onUploadFailure(errorCode, errorString) {
+                alert('Upload failed: ' + errorString);
+            }
+
+            function getCurPagePath() {
+                var strHttpServer = location.protocol + '//' +
+                    location.hostname +
+                    (location.port === '' ? '' : ':' + location.port),
+                    curPathName = unescape(location.pathname),
+                    curPath = curPathName.substring(0, curPathName.lastIndexOf("/") + 1);
+
+                return strHttpServer + curPath;
+            }
+
+            function onUpload() {
+                if (!dcsObject || !imageViewer) return;
+
+                if (imageViewer.image.getCount() === 0) {
+                    alert('Please grab an image first.');
+                    return;
+                }
+
+                var counter,
+                    url = getCurPagePath() + 'upload',
+                    fileName = new Date().getMilliseconds() + '.jpg',
+                    imageType = imageViewer.io.EnumImageType.JPEG,
+                    bMultiImages = false,
+                    imageIndexArray = [];
+
+                if (bMultiImages) {
+                    for (counter = 0; counter < imageViewer.image.getCount(); counter++) imageIndexArray.push(counter);
+                } else imageIndexArray.push(imageViewer.image.getIndex());
+
+                imageViewer.io.setHTTPFormFields({
+                    "fileName": fileName
+                });
+                imageViewer.io.httpUploadAsync(url, imageIndexArray, imageType, onUploadSuccess, onUploadFailure);
+            }
+
+            // Initialize DCS
+            dynamsoft.dcsEnv.init('video-container', 'image-container', onInitSuccess, onInitFailure);
+
+            // Destroy DCS
+            window.onbeforeunload = function () {
+                if (dcsObject) dcsObject.destroy();
+            };
+        </script>
+    </div>
+</body>
+
+</html>
